@@ -1,0 +1,6 @@
+{
+  "extends": "strict",
+  "rules": {
+    "indent": ["warn", 2]
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "metamorphic",
+  "version": "0.0.1",
+  "description": "A factory contract for creating metamorphic (i.e. redeployable) contracts.",
+  "author": "0age",
+  "license": "MIT",
+  "dependencies": {
+    "ethereumjs-util": "^6.0.0",
+    "ganache-cli": "6.3.0",
+    "solhint": "^1.4.1",
+    "truffle": "5.0.4",
+    "web3": "1.0.0-beta.37"
+  },
+  "scripts": {
+  	"all": "./node_modules/.bin/ganache-cli 2>&1 > ganache-output.log & echo 'local chain started.' && ./node_modules/.bin/truffle compile && node scripts/test/ci.js && ./node_modules/.bin/solhint 'contracts/**/*.sol'; kill -9 \"$(ps -ax | grep '[b]in/node ./node_modules/.bin/ganache-cli' | awk '{print $1;}')\" && echo 'local chain stopped.'",
+    "build": "./node_modules/.bin/truffle compile",
+    "ci": "./node_modules/.bin/ganache-cli -q & echo 'local chain started.' && ./node_modules/.bin/truffle compile && node scripts/test/ci.js && ./node_modules/.bin/solhint 'contracts/**/*.sol'",
+    "linter": "./node_modules/.bin/solhint 'contracts/**/*.sol'",
+    "start": "./node_modules/.bin/ganache-cli 2>&1 > ganache-output.log & echo 'local chain started.'",
+    "stop": "kill -9 \"$(ps -ax | grep '[b]in/node ./node_modules/.bin/ganache-cli' | awk '{print $1;}')\" && echo 'local chain stopped.'",
+    "test": "./node_modules/.bin/truffle compile && node scripts/test/ci.js"
+  }
+}
