@@ -3,10 +3,12 @@ var fs = require('fs')
 var util = require('ethereumjs-util')
 
 const MetamorphicContractFactoryArtifact = require('../../build/contracts/MetamorphicContractFactory.json')
-const TransientContractArtifact = require('../../build/contracts/TransientContract.json')
 const ImmutableCreate2FactoryArtifact = require('../../build/contracts/ImmutableCreate2Factory.json')
 const ContractOneArtifact = require('../../build/contracts/ContractOne.json')
 const ContractTwoArtifact = require('../../build/contracts/ContractTwo.json')
+const CodeCheckArtifact = require('../../build/contracts/CodeCheck.json')
+
+const MetamorphicContractBytecode = '0x5860208158601c335a63aaf10f428752fa158151803b80938091923cf3'
 
 module.exports = {test: async function (provider, testingContext) {
   var web3 = provider
@@ -265,16 +267,16 @@ module.exports = {test: async function (provider, testingContext) {
     MetamorphicContractFactoryArtifact.abi
   )
 
-  const TransientContractDeployer = new web3.eth.Contract(
-    TransientContractArtifact.abi
-  )
-
   const ImmutableCreate2FactoryDeployer = new web3.eth.Contract(
     ImmutableCreate2FactoryArtifact.abi
   )
 
   const ContractTwoDeployer = new web3.eth.Contract(
     ContractTwoArtifact.abi
+  )
+
+  const CodeCheckDeployer = new web3.eth.Contract(
+    CodeCheckArtifact.abi
   )
 
   let dataPayload = ImmutableCreate2FactoryDeployer.deploy({
@@ -304,15 +306,13 @@ module.exports = {test: async function (provider, testingContext) {
   passed++
 
   dataPayload = MetamorphicContractFactoryDeployer.deploy({
-    data: MetamorphicContractFactoryArtifact.bytecode,
-    arguments: [TransientContractArtifact.bytecode]
+    data: MetamorphicContractFactoryArtifact.bytecode
   }).encodeABI()
 
   deployGas = await getDeployGas(dataPayload)
 
   const MetamorphicContractFactory = await MetamorphicContractFactoryDeployer.deploy({
-    data: MetamorphicContractFactoryArtifact.bytecode,
-    arguments: [TransientContractArtifact.bytecode]
+    data: MetamorphicContractFactoryArtifact.bytecode
   }).send({
     from: address,
     gas: deployGas,
@@ -357,39 +357,44 @@ module.exports = {test: async function (provider, testingContext) {
   )
   passed++
 
+  dataPayload = CodeCheckDeployer.deploy({
+    data: CodeCheckArtifact.bytecode
+  }).encodeABI()
+
+  deployGas = await getDeployGas(dataPayload)
+
+  const CodeCheck = await CodeCheckDeployer.deploy({
+    data: CodeCheckArtifact.bytecode
+  }).send({
+    from: address,
+    gas: deployGas,
+    gasPrice: 10 ** 1
+  }).catch(error => {
+    console.error(error)
+    console.log(
+      ` ✘ CodeCheck contract deploys successfully for ${deployGas} gas`
+    )
+    failed++
+    process.exit(1)
+  })
+
+  console.log(
+    ` ✓ CodeCheck contract deploys successfully for ${deployGas} gas`
+  )
+  passed++
+
   let create2payload = (
     '0xff' +
     MetamorphicContractFactory.options.address.slice(2) +
     address.slice(2) + '000000000000000000000000' +
-    web3.utils.keccak256(TransientContractArtifact.bytecode).slice(2)
-  )
-
-  const targetTransientContractAddress = web3.utils.toChecksumAddress(
-    '0x' + web3.utils.sha3(
-      create2payload,
-      {encoding: "hex"}
-    ).slice(12).substring(14)
+    web3.utils.keccak256(MetamorphicContractBytecode, {encoding: "hex"}).slice(2)
   )
 
   const targetMetamorphicContractAddress = web3.utils.toChecksumAddress(
     '0x' + web3.utils.sha3(
-      '0xd694' + targetTransientContractAddress.slice(2) + '01',
+      create2payload,
       {encoding: "hex"}
     ).slice(12).substring(14)
-  )
-
-  await runTest(
-    'MetamorphicContractFactory can check for address of a transient contract',
-    MetamorphicContractFactory,
-    'findTransientContractAddress',
-    'call',
-    [
-      address + '000000000000000000000000'
-    ],
-    true,
-    value => {
-      assert.strictEqual(value, targetTransientContractAddress)
-    }
   )
 
   await runTest(
@@ -407,31 +412,28 @@ module.exports = {test: async function (provider, testingContext) {
   )
 
   await runTest(
-    'MetamorphicContractFactory can get init code of transient contract',
+    'MetamorphicContractFactory can get init code of metamorphic contract',
     MetamorphicContractFactory,
-    'getTransientContractInitializationCode',
+    'getMetamorphicContractInitializationCode',
     'call',
     [],
     true,
     value => {
-      assert.strictEqual(value, TransientContractArtifact.bytecode)
+      assert.strictEqual(value, MetamorphicContractBytecode)
     }
   )
 
   await runTest(
-    'MetamorphicContractFactory can get init code hash of transient contract',
+    'MetamorphicContractFactory can get init code hash of metamorphic contract',
     MetamorphicContractFactory,
-    'getTransientContractInitializationCodeHash',
+    'getMetamorphicContractInitializationCodeHash',
     'call',
     [],
     true,
     value => {
       assert.strictEqual(
         value,
-        web3.utils.keccak256(
-          TransientContractArtifact.bytecode,
-          {encoding: 'hex'}
-        )
+        web3.utils.keccak256(MetamorphicContractBytecode, {encoding: "hex"})
       )
     }
   )
@@ -445,8 +447,29 @@ module.exports = {test: async function (provider, testingContext) {
       address + '000000000000000000000000',
       ContractOneArtifact.bytecode,
       '0x8129fc1c' // initialize()
-    ]
+    ],
+    true,
+    receipt => {
+      assert.strictEqual(
+        receipt.events.Metamorphosed.returnValues.metamorphicContract,
+        targetMetamorphicContractAddress
+      )
+    }
   )
+
+  await runTest(
+    'CodeCheck can check the code of the metamorphic contract',
+    CodeCheck,
+    'check',
+    'call',
+    [
+      targetMetamorphicContractAddress
+    ],
+    true,
+    value => {
+      assert.strictEqual(value, ContractOneArtifact.deployedBytecode)    
+    }
+  )  
 
   const Metamorphic = new web3.eth.Contract(
     ContractOneArtifact.abi,
@@ -491,6 +514,20 @@ module.exports = {test: async function (provider, testingContext) {
     address,
     1
   )
+
+  await runTest(
+    'CodeCheck can check the code of the new metamorphic contract',
+    CodeCheck,
+    'check',
+    'call',
+    [
+      targetMetamorphicContractAddress
+    ],
+    true,
+    value => {
+      assert.strictEqual(value, ContractTwoArtifact.deployedBytecode)    
+    }
+  ) 
 
   await runTest(
     'Metamorphic contract can check for new test value',
