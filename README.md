@@ -44,7 +44,11 @@ $ yarn stop
 
 ## API
 
-### [MetamorphicContractFactory.sol](../contracts/MetamorphicContractFactory.sol)
+
+- [MetamorphicContractFactory.sol](#metamorphiccontractfactorysol)
+- [ImmutableCreate2Factory.sol](#immutablecreate2factorysol)
+
+### [MetamorphicContractFactory.sol](https://github.com/0age/metamorphic/blob/master/contracts/MetamorphicContractFactory.sol)
 
 This contract creates metamorphic contracts, or contracts that can be redeployed with new code to the same address. It does so by deploying a contract with fixed, non-deterministic initialization code via the `CREATE2` opcode. This contract clones the implementation contract in its constructor. Once a contract undergoes metamorphosis, all existing storage will be deleted and any existing contract code will be replaced with the deployed contract code of the new implementation contract.
 
@@ -181,7 +185,7 @@ function getMetamorphicContractInitializationCodeHash() external view returns (
 )
 ```
 
-### [ImmutableCreate2Factory.sol](../contracts/ImmutableCreate2Factory.sol)
+### [ImmutableCreate2Factory.sol](https://github.com/0age/metamorphic/blob/master/contracts/ImmutableCreate2Factory.sol)
 
 This contract provides a safeCreate2 function that takes a salt value and a block of initialization code as arguments and passes them into inline assembly. The contract prevents redeploys by maintaining a mapping of all contracts that have already been deployed, and prevents frontrunning or other collisions by requiring that the first 20 bytes of the salt are equal to the address of the caller *(this can be bypassed by setting the first 20 bytes to the null address)*. There is also a view function that computes the address of the contract that will be created when submitting a given salt or nonce along with a given block of initialization code.
 
