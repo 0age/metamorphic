@@ -3,7 +3,6 @@ pragma solidity 0.5.3;
 
 /**
  * @title CodeCheck
- * @author 0age
  * @notice This contract checks the deployed runtime code of another contract.
  */
 contract CodeCheck {

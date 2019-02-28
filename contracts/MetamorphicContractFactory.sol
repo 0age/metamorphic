@@ -16,7 +16,14 @@ pragma solidity 0.5.3;
  * with caution and please share any exploits or optimizations you discover.
  */
 contract MetamorphicContractFactory {
+  // fires when a metamorphic contract is deployed by cloning another contract.
   event Metamorphosed(address metamorphicContract, address newImplementation);
+  
+  // fires when a metamorphic contract is deployed through a transient contract.
+  event MetamorphosedWithConstructor(
+    address metamorphicContract,
+    address transientContract
+  );
 
   // store the initialization code for metamorphic contracts.
   bytes private _metamorphicContractInitializationCode;
@@ -24,12 +31,24 @@ contract MetamorphicContractFactory {
   // store hash of the initialization code for metamorphic contracts as well.
   bytes32 private _metamorphicContractInitializationCodeHash;
 
+  // store init code for transient contracts that deploy metamorphic contracts.
+  bytes private _transientContractInitializationCode;
+
+  // store the hash of the initialization code for transient contracts as well.
+  bytes32 private _transientContractInitializationCodeHash;
+
   // maintain a mapping of metamorphic contracts to metamorphic implementations.
   mapping(address => address) private _implementations;
+
+  // maintain a mapping of transient contracts to metamorphic init codes.
+  mapping(address => bytes) private _initCodes;
 
   /**
    * @dev In the constructor, set up the initialization code for metamorphic
    * contracts as well as the keccak256 hash of the given initialization code.
+   * @param transientContractInitializationCode bytes The initialization code
+   * that will be used to deploy any transient contracts, which will deploy any
+   * metamorphic contracts that require the use of a constructor.
    * 
    * Metamorphic contract initialization code (29 bytes): 
    *
@@ -105,17 +124,29 @@ contract MetamorphicContractFactory {
    * ** return to deploy final code in memory **
    * 25 f3 return         []                                        *deployed!*
    *
+   *
+   * Transient contract initialization code derived from TransientContract.sol.
    */
-  constructor() public {
+  constructor(bytes memory transientContractInitializationCode) public {
     // assign the initialization code for the metamorphic contract.
     _metamorphicContractInitializationCode = (
       hex"5860208158601c335a63aaf10f428752fa158151803b80938091923cf3"
     );
 
-    // calculate and assign the keccak256 hash of the initialization code.
+    // calculate and assign keccak256 hash of metamorphic initialization code.
     _metamorphicContractInitializationCodeHash = keccak256(
       abi.encodePacked(
         _metamorphicContractInitializationCode
+      )
+    );
+
+    // store the initialization code for the transient contract.
+    _transientContractInitializationCode = transientContractInitializationCode;
+
+    // calculate and assign keccak256 hash of transient initialization code.
+    _transientContractInitializationCodeHash = keccak256(
+      abi.encodePacked(
+        _transientContractInitializationCode
       )
     );
   }
@@ -286,12 +317,87 @@ contract MetamorphicContractFactory {
     emit Metamorphosed(deployedMetamorphicContract, implementationContract);
   }
 
+  /* solhint-disable function-max-lines */
+  /**
+   * @dev Deploy a metamorphic contract by submitting a given salt or nonce
+   * along with the initialization code to a transient contract which will then
+   * deploy the metamorphic contract before immediately selfdestructing. To
+   * replace the metamorphic contract, first selfdestruct the current contract,
+   * then call with the same salt value and new initialization code (be aware
+   * that all existing state will be wiped from the existing contract). Also
+   * note that the first 20 bytes of the salt must match the calling address,
+   * which prevents contracts from being created by unintended parties.
+   * @param salt bytes32 The nonce that will be passed into the CREATE2 call and
+   * thus will determine the resulant address of the metamorphic contract.
+   * @param initializationCode bytes The initialization code for the metamorphic
+   * contract that will be deployed by the transient contract.
+   * @return Address of the metamorphic contract that will be created.
+   */
+  function deployMetamorphicContractWithConstructor(
+    bytes32 salt,
+    bytes calldata initializationCode
+  ) external payable containsCaller(salt) returns (
+    address metamorphicContractAddress
+  ) {
+    // move transient contract initialization code from storage to memory.
+    bytes memory initCode = _transientContractInitializationCode;
+
+    // declare variable to verify successful transient contract deployment.
+    address deployedTransientContract;
+
+    // determine the address of the transient contract.
+    address transientContractAddress = _getTransientContractAddress(salt);
+
+    // store the initialization code to be retrieved by the transient contract.
+    _initCodes[transientContractAddress] = initializationCode;
+
+    // load transient contract data and length of data, then deploy via CREATE2.
+    /* solhint-disable no-inline-assembly */
+    assembly {
+      let encoded_data := add(0x20, initCode) // load initialization code.
+      let encoded_size := mload(initCode)     // load the init code's length.
+      deployedTransientContract := create2(   // call CREATE2 with 4 arguments.
+        callvalue,                            // forward any supplied endowment.
+        encoded_data,                         // pass in initialization code.
+        encoded_size,                         // pass in init code's length.
+        salt                                  // pass in the salt value.
+      )
+    } /* solhint-enable no-inline-assembly */
+
+    // ensure that the contracts were successfully deployed.
+    require(
+      deployedTransientContract == transientContractAddress,
+      "Failed to deploy metamorphic contract using given salt and init code."
+    );
+
+    metamorphicContractAddress = _getMetamorphicContractAddressWithConstructor(
+      transientContractAddress
+    );
+
+    emit MetamorphosedWithConstructor(
+      metamorphicContractAddress,
+      transientContractAddress
+    );
+  } /* solhint-enable function-max-lines */
+
   /**
    * @dev View function for retrieving the address of the implementation
    * contract to clone. Called by the constructor of each metamorphic contract.
    */
   function getImplementation() external view returns (address implementation) {
     return _implementations[msg.sender];
+  }
+
+  /**
+   * @dev View function for retrieving the initialization code for a given
+   * metamorphic contract to deploy via a transient contract. Called by the
+   * constructor of each transient contract.
+   * @return The initialization code to use to deploy the metamorphic contract.
+   */
+  function getInitializationCode() external view returns (
+    bytes memory initializationCode
+  ) {
+    return _initCodes[msg.sender];
   }
 
   /**
@@ -311,6 +417,20 @@ contract MetamorphicContractFactory {
   }
 
   /**
+   * @dev View function for retrieving the initialization code for a given
+   * metamorphic contract instance deployed via a transient contract, where the address
+   * of the transient contract is supplied as an argument.
+   * @param transientContractAddress address The address of the transient
+   * contract that deployed the metamorphic contract.
+   * @return The initialization code used to deploy the metamorphic contract.
+   */
+  function getMetamorphicContractInstanceInitializationCode(
+    address transientContractAddress
+  ) external view returns (bytes memory initializationCode) {
+    return _initCodes[transientContractAddress];
+  }
+
+  /**
    * @dev Compute the address of the metamorphic contract that will be created
    * upon submitting a given salt to the contract.
    * @param salt bytes32 The nonce passed into CREATE2 by metamorphic contract.
@@ -321,6 +441,36 @@ contract MetamorphicContractFactory {
   ) external view returns (address metamorphicContractAddress) {
     // determine the address where the metamorphic contract will be deployed.
     metamorphicContractAddress = _getMetamorphicContractAddress(salt);
+  }
+
+  /**
+   * @dev Compute the address of the transient contract that will be created
+   * upon submitting a given salt to the contract.
+   * @param salt bytes32 The nonce passed into CREATE2 when deploying the
+   * transient contract.
+   * @return Address of the corresponding transient contract.
+   */
+  function findTransientContractAddress(
+    bytes32 salt
+  ) external view returns (address transientContractAddress) {
+    // determine the address where the transient contract will be deployed.
+    transientContractAddress = _getTransientContractAddress(salt);
+  }
+
+  /**
+   * @dev Compute the address of the metamorphic contract that will be created
+   * by the transient contract upon submitting a given salt to the contract.
+   * @param salt bytes32 The nonce passed into CREATE2 when deploying the
+   * transient contract.
+   * @return Address of the corresponding metamorphic contract.
+   */
+  function findMetamorphicContractAddressWithConstructor(
+    bytes32 salt
+  ) external view returns (address metamorphicContractAddress) {
+    // determine the address of the metamorphic contract.
+    metamorphicContractAddress = _getMetamorphicContractAddressWithConstructor(
+      _getTransientContractAddress(salt)
+    );
   }
 
   /**
@@ -344,6 +494,26 @@ contract MetamorphicContractFactory {
   }
 
   /**
+   * @dev View function for retrieving the initialization code of transient
+   * contracts for purposes of verification.
+   */
+  function getTransientContractInitializationCode() external view returns (
+    bytes memory transientContractInitializationCode
+  ) {
+    return _transientContractInitializationCode;
+  }
+
+  /**
+   * @dev View function for retrieving the keccak256 hash of the initialization
+   * code of transient contracts for purposes of verification.
+   */
+  function getTransientContractInitializationCodeHash() external view returns (
+    bytes32 transientContractInitializationCodeHash
+  ) {
+    return _transientContractInitializationCodeHash;
+  }
+
+  /**
    * @dev Internal view function for calculating a metamorphic contract address
    * given a particular salt.
    */
@@ -360,6 +530,55 @@ contract MetamorphicContractFactory {
               address(this),        // this contract will be the caller.
               salt,                 // pass in the supplied salt value.
               _metamorphicContractInitializationCodeHash // the init code hash.
+            )
+          )
+        )
+      )
+    );
+  }
+
+  /**
+   * @dev Internal view function for calculating a transient contract address
+   * given a particular salt.
+   */
+  function _getTransientContractAddress(
+    bytes32 salt
+  ) internal view returns (address) {
+    // determine the address of the transient contract.
+    return address(
+      uint160(                      // downcast to match the address type.
+        uint256(                    // convert to uint to truncate upper digits.
+          keccak256(                // compute the CREATE2 hash using 4 inputs.
+            abi.encodePacked(       // pack all inputs to the hash together.
+              hex"ff",              // start with 0xff to distinguish from RLP.
+              address(this),        // this contract will be the caller.
+              salt,                 // pass in the supplied salt value.
+              _transientContractInitializationCodeHash // supply init code hash.
+            )
+          )
+        )
+      )
+    );
+  }
+
+  /**
+   * @dev Internal view function for calculating a metamorphic contract address
+   * that has been deployed via a transient contract given the address of the
+   * transient contract.
+   */
+  function _getMetamorphicContractAddressWithConstructor(
+    address transientContractAddress
+  ) internal pure returns (address) { 
+    // determine the address of the metamorphic contract.
+    return address(
+      uint160(                          // downcast to match the address type.
+        uint256(                        // set to uint to truncate upper digits.
+          keccak256(                    // compute CREATE hash via RLP encoding.
+            abi.encodePacked(           // pack all inputs to the hash together.
+              byte(0xd6),               // first RLP byte.
+              byte(0x94),               // second RLP byte.
+              transientContractAddress, // called by the transient contract.
+              byte(0x01)                // nonce begins at 1 for contracts.
             )
           )
         )

@@ -7,7 +7,7 @@
 
 > Metamorphic - A factory contract for creating metamorphic (i.e. redeployable) contracts.
 
-This [factory contract](https://github.com/0age/metamorphic/blob/master/contracts/MetamorphicContractFactory.sol) creates *metamorphic contracts*, or contracts that can be redeployed with new code to the same address. It does so by deploying the metamorphic contract with fixed, non-deterministic initialization code via the CREATE2 opcode. This initalization code clones a given implementation contract and optionally initializes it in one operation. Once a contract undergoes metamorphosis, all existing storage will be deleted and any existing contract code will be replaced with the deployed contract code of the new implementation contract. There is also an [immutable create2 factory](https://github.com/0age/metamorphic/blob/master/contracts/ImmutableCreate2Factory.sol) that will not perform contract redeployments, thereby preventing metamorphism in contracts it deploys.
+This [factory contract](https://github.com/0age/metamorphic/blob/master/contracts/MetamorphicContractFactory.sol) creates *metamorphic contracts*, or contracts that can be redeployed with new code to the same address. It does so by deploying the metamorphic contract with fixed, non-deterministic initialization code via the CREATE2 opcode. This initalization code clones a given implementation contract and optionally initializes it in one operation. Once a contract undergoes metamorphosis, all existing storage will be deleted and any existing contract code will be replaced with the deployed contract code of the new implementation contract. Alternately, the factory can also create metamorphic contracts that utilize a constructor by deploying them with an intermediate [transient contract](https://github.com/0age/metamorphic/blob/master/contracts/TransientContract.sol) - otherwise an argument for atomically calling an initialization function after cloning an instance may be used. There is also an [immutable create2 factory](https://github.com/0age/metamorphic/blob/master/contracts/ImmutableCreate2Factory.sol) that will not perform contract redeployments, thereby preventing metamorphism of any contract it deploys *(although they may still deploy their own metamorphic contracts)*.
 
 **DISCLAIMER: this implements a highly experimental feature / bug - be sure to implement appropriate controls on your metamorphic contracts and *educate the users of your contract* if it will be interacted with! CREATE2 will not be available on mainnet until (at least) block 7,280,000. This contract has not yet been fully tested or audited - proceed with caution and please share any exploits or optimizations you discover.**
 
@@ -44,6 +44,7 @@ $ yarn stop
 
 ## API
 
+**This documentation is incomplete - see the source code of each contract for a more complete summary.**
 
 - [MetamorphicContractFactory.sol](#metamorphiccontractfactorysol)
 - [ImmutableCreate2Factory.sol](#immutablecreate2factorysol)

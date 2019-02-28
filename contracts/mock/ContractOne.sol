@@ -3,7 +3,6 @@ pragma solidity 0.5.3;
 
 /**
  * @title ContractOne
- * @author 0age
  * @notice This is the first implementation of an example metamorphic contract.
  */
 contract ContractOne {
