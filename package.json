@@ -1,6 +1,6 @@
 {
   "name": "metamorphic",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "A factory contract for creating metamorphic (i.e. redeployable) contracts.",
   "author": "0age",
   "license": "MIT",
@@ -14,13 +14,13 @@
     "web3": "1.0.0-beta.37"
   },
   "scripts": {
-    "all": "./node_modules/.bin/ganache-cli 2>&1 > ganache-output.log & echo 'local chain started.' && ./node_modules/.bin/truffle compile && node scripts/test/ci.js && ./node_modules/.bin/solhint 'contracts/**/*.sol'; kill -9 \"$(ps -ax | grep '[n]ode ./node_modules/.bin/ganache-cli' | awk '{print $1;}')\" && echo 'local chain stopped.'",
+    "all": "./node_modules/.bin/ganache-cli 2>&1 > ganache-output.log & echo 'local chain started.' && ./node_modules/.bin/truffle compile && node scripts/kakuna/ci.js KakunaBasicTest 0x4150 && node scripts/test/ci.js && ./node_modules/.bin/solhint 'contracts/**/*.sol'; kill -9 \"$(ps -ax | grep '[n]ode ./node_modules/.bin/ganache-cli' | awk '{print $1;}')\" && echo 'local chain stopped.'",
     "build": "./node_modules/.bin/truffle compile && node scripts/kakuna/ci.js KakunaBasicTest 0x4150",
     "ci": "./node_modules/.bin/ganache-cli -q & echo 'local chain started.' && ./node_modules/.bin/truffle compile && node scripts/kakuna/ci.js KakunaBasicTest 0x4150 && node scripts/test/ci.js && ./node_modules/.bin/solhint 'contracts/**/*.sol'",
     "kakuna": "node scripts/kakuna/ci.js",
     "linter": "./node_modules/.bin/solhint 'contracts/**/*.sol'",
     "start": "./node_modules/.bin/ganache-cli 2>&1 > ganache-output.log & echo 'local chain started.'",
     "stop": "kill -9 \"$(ps -ax | grep '[n]ode ./node_modules/.bin/ganache-cli' | awk '{print $1;}')\" && echo 'local chain stopped.'",
-    "test": "./node_modules/.bin/truffle compile && node scripts/test/ci.js"
+    "test": "./node_modules/.bin/truffle compile && node scripts/kakuna/ci.js KakunaBasicTest 0x4150 && node scripts/test/ci.js"
   }
 }
