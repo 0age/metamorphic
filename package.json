@@ -1,23 +1,26 @@
 {
   "name": "metamorphic",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A factory contract for creating metamorphic (i.e. redeployable) contracts.",
   "author": "0age",
   "license": "MIT",
   "dependencies": {
-    "ethereumjs-util": "^6.0.0",
+    "ethereumjs-util": "^6.1.0",
+    "ethereumjs-vm": "^2.6.0",
     "ganache-cli": "6.3.0",
+    "js-sha256": "^0.9.0",
     "solhint": "^1.4.1",
     "truffle": "5.0.4",
     "web3": "1.0.0-beta.37"
   },
   "scripts": {
-  	"all": "./node_modules/.bin/ganache-cli 2>&1 > ganache-output.log & echo 'local chain started.' && ./node_modules/.bin/truffle compile && node scripts/test/ci.js && ./node_modules/.bin/solhint 'contracts/**/*.sol'; kill -9 \"$(ps -ax | grep '[b]in/node ./node_modules/.bin/ganache-cli' | awk '{print $1;}')\" && echo 'local chain stopped.'",
-    "build": "./node_modules/.bin/truffle compile",
+    "all": "./node_modules/.bin/ganache-cli 2>&1 > ganache-output.log & echo 'local chain started.' && ./node_modules/.bin/truffle compile && node scripts/test/ci.js && ./node_modules/.bin/solhint 'contracts/**/*.sol'; kill -9 \"$(ps -ax | grep '[n]ode ./node_modules/.bin/ganache-cli' | awk '{print $1;}')\" && echo 'local chain stopped.'",
+    "build": "./node_modules/.bin/truffle compile && node scripts/kakuna/ci.js KakunaBasicTest 0x4150",
     "ci": "./node_modules/.bin/ganache-cli -q & echo 'local chain started.' && ./node_modules/.bin/truffle compile && node scripts/test/ci.js && ./node_modules/.bin/solhint 'contracts/**/*.sol'",
+    "kakuna": "node scripts/kakuna/ci.js",
     "linter": "./node_modules/.bin/solhint 'contracts/**/*.sol'",
     "start": "./node_modules/.bin/ganache-cli 2>&1 > ganache-output.log & echo 'local chain started.'",
-    "stop": "kill -9 \"$(ps -ax | grep '[b]in/node ./node_modules/.bin/ganache-cli' | awk '{print $1;}')\" && echo 'local chain stopped.'",
+    "stop": "kill -9 \"$(ps -ax | grep '[n]ode ./node_modules/.bin/ganache-cli' | awk '{print $1;}')\" && echo 'local chain stopped.'",
     "test": "./node_modules/.bin/truffle compile && node scripts/test/ci.js"
   }
 }

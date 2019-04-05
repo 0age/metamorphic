@@ -9,13 +9,17 @@
 
 This [factory contract](https://github.com/0age/metamorphic/blob/master/contracts/MetamorphicContractFactory.sol) creates *metamorphic contracts*, or contracts that can be redeployed with new code to the same address. It does so by deploying the metamorphic contract with fixed, non-deterministic initialization code via the CREATE2 opcode. This initalization code clones a given implementation contract and optionally initializes it in one operation. Once a contract undergoes metamorphosis, all existing storage will be deleted and any existing contract code will be replaced with the deployed contract code of the new implementation contract. Alternately, the factory can also create metamorphic contracts that utilize a constructor by deploying them with an intermediate [transient contract](https://github.com/0age/metamorphic/blob/master/contracts/TransientContract.sol) - otherwise an argument for atomically calling an initialization function after cloning an instance may be used. There is also an [immutable create2 factory](https://github.com/0age/metamorphic/blob/master/contracts/ImmutableCreate2Factory.sol) that will not perform contract redeployments, thereby preventing metamorphism of any contract it deploys *(although they may still deploy their own metamorphic contracts)*.
 
-**DISCLAIMER: this implements a highly experimental feature / bug - be sure to implement appropriate controls on your metamorphic contracts and *educate the users of your contract* if it will be interacted with! CREATE2 will not be available on mainnet until (at least) block 7,280,000. This contract has not yet been fully tested or audited - proceed with caution and please share any exploits or optimizations you discover.**
+This repo also includes [Metapod](https://github.com/0age/metamorphic/blob/master/contracts/Metapod.sol), a factory for deploying "hardened" metamorphic contracts. All contracts deployed through Metapod must include a prelude *(or initial snippet of code)* that allows it to destroy the contract and forward all funds to a dedicated vault contract. In order to insert the prelude into your contract, any stack items used by `JUMP` or `JUMPI` destinations, as well as by `CODECOPY` offsets, must first be modified. To try this out, there's a provided utility called [Kakuna](https://github.com/0age/metamorphic/blob/master/scripts/kakuna/kakuna.js), an **error-prone POC** for analyzing a contract and inserting a prelude.
+
+**DISCLAIMER: this implements highly experimental features / bugs - be sure to implement appropriate controls on your metamorphic contracts and *educate the users of your contract* if it will be interacted with! These contracts have not yet been fully tested or audited - proceed with caution and please share any exploits or optimizations you discover.**
 
 See [this medium post](https://medium.com/@0age/the-promise-and-the-peril-of-metamorphic-contracts-9eb8b8413c5e) for context.
 
-Metamorphic Contract Factory on Ropsten: [0x00000080b6388c004fF9FD2C001B00F96fcDfFa3](https://ropsten.etherscan.io/address/0x00000080b6388c004ff9fd2c001b00f96fcdffa3)
+Metamorphic Contract Factory on Ropsten: [0x00000000D63fB7385Ae38E7753F70e36d190abc2](https://ropsten.etherscan.io/address/0x00000000D63fB7385Ae38E7753F70e36d190abc2)
 
 Immutable Create2 Factory on Ropsten: [0x000000B64Df4e600F23000dbAEEB8c0052C88e73](https://ropsten.etherscan.io/address/0x000000b64df4e600f23000dbaeeb8c0052c88e73)
+
+Metapod on Ropsten: [0x00000000004E487689D42518F16a713b7AB1f9b4](https://ropsten.etherscan.io/address/0x00000000004e487689d42518f16a713b7ab1f9b4)
 
 ## Table of Contents
 
@@ -42,6 +46,11 @@ $ yarn start
 $ yarn test
 $ yarn linter
 $ yarn stop
+```
+
+To use Kakuna, first build the contracts, then run the following, replacing the contract name and prelude as desired (you'll need to calculate the correct prelude using your particular vault address for use with Metapod):
+```sh
+$ yarn kakuna ContractOne 0x4150
 ```
 
 ## API

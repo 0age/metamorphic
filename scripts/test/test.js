@@ -2,6 +2,8 @@ var assert = require('assert')
 var fs = require('fs')
 var util = require('ethereumjs-util')
 
+var kakuna = require('../kakuna/kakuna.js')
+
 const MetamorphicContractFactoryArtifact = require('../../build/contracts/MetamorphicContractFactory.json')
 const TransientContractArtifact = require('../../build/contracts/TransientContract.json')
 const ImmutableCreate2FactoryArtifact = require('../../build/contracts/ImmutableCreate2Factory.json')
@@ -9,6 +11,9 @@ const ContractOneArtifact = require('../../build/contracts/ContractOne.json')
 const ContractTwoArtifact = require('../../build/contracts/ContractTwo.json')
 const ContractWithConstructorArtifact = require('../../build/contracts/ContractWithConstructor.json')
 const CodeCheckArtifact = require('../../build/contracts/CodeCheck.json')
+const MetapodArtifact = require('../../build/contracts/Metapod.json')
+const KakunaBasicTestArtifact = require('../../build/contracts/KakunaBasicTest.json')
+const KakunaBasicTestWithPreludeArtifact = require('../../build/kakuna/KakunaBasicTest.json')
 
 const MetamorphicContractBytecode = '0x5860208158601c335a63aaf10f428752fa158151803b80938091923cf3'
 
@@ -119,7 +124,8 @@ module.exports = {test: async function (provider, testingContext) {
     shouldSucceed,
     assertionCallback,
     from,
-    value
+    value,
+    gas
   ) {
     if (typeof(callOrSend) === 'undefined') {
       callOrSend = 'send'
@@ -139,6 +145,9 @@ module.exports = {test: async function (provider, testingContext) {
     if (typeof(value) === 'undefined') {
       value = 0
     }
+    if (typeof(gas) === 'undefined') {
+      gas = gasLimit - 1
+    }
     let ok = false
     if (callOrSend === 'send') {
       ok = await send(
@@ -148,7 +157,7 @@ module.exports = {test: async function (provider, testingContext) {
         args,
         from,
         value,
-        gasLimit - 1,
+        gas,
         10 ** 1,
         shouldSucceed,
         assertionCallback
@@ -161,7 +170,7 @@ module.exports = {test: async function (provider, testingContext) {
         args,
         from,
         value,
-        gasLimit - 1,
+        gas,
         10 ** 1,
         shouldSucceed,
         assertionCallback
@@ -281,6 +290,14 @@ module.exports = {test: async function (provider, testingContext) {
     CodeCheckArtifact.abi
   )
 
+  //const MetapodDeployer = new web3.eth.Contract(
+  //  MetapodArtifact.abi
+  //)
+
+  const KakunaBasicTestDeployer = new web3.eth.Contract(
+    KakunaBasicTestArtifact.abi
+  )
+
   let dataPayload = ImmutableCreate2FactoryDeployer.deploy({
     data: ImmutableCreate2FactoryArtifact.bytecode
   }).encodeABI()
@@ -312,6 +329,9 @@ module.exports = {test: async function (provider, testingContext) {
     arguments: [TransientContractArtifact.bytecode]
   }).encodeABI()
 
+  //console.log(dataPayload)
+  //process.exit()
+
   deployGas = await getDeployGas(dataPayload)
 
   const MetamorphicContractFactory = await MetamorphicContractFactoryDeployer.deploy({
@@ -334,6 +354,8 @@ module.exports = {test: async function (provider, testingContext) {
     ` ✓ Metamorphic Contract Factory deploys successfully for ${deployGas} gas`
   )
   passed++
+
+  //console.log(MetamorphicContractFactory.options.address)
 
   dataPayload = ContractTwoDeployer.deploy({
     data: ContractTwoArtifact.bytecode
@@ -384,6 +406,135 @@ module.exports = {test: async function (provider, testingContext) {
 
   console.log(
     ` ✓ CodeCheck contract deploys successfully for ${deployGas} gas`
+  )
+  passed++
+
+  /*
+  console.log(MetamorphicContractFactory.options.address)
+  console.log(address)
+  await runTest(
+    'MetamorphicContractFactory can get init code hash of transient contract',
+    MetamorphicContractFactory,
+    'getTransientContractInitializationCodeHash',
+    'call',
+    [],
+    true,
+    value => {
+      console.log(value)
+    }
+  )
+  */
+
+  await runTest(
+    'MetamorphicContractFactory can deploy Metapod',
+    MetamorphicContractFactory,
+    'deployMetamorphicContractWithConstructor',
+    'send',
+    [
+      //address + 'e73fb603a03b4000007eb5df',
+      address + '10f74f2d75490b0486060000',
+      //address + '10f74f2d75490b0486060000',
+      MetapodArtifact.bytecode
+    ],
+    true,
+    receipt => {
+      assert.strictEqual(
+        receipt.events.MetamorphosedWithConstructor.returnValues.metamorphicContract,
+        '0x000000000003212eb796dEE588acdbBbD777D4E7'
+      )
+    }
+  )
+
+  const Metapod = new web3.eth.Contract(
+    MetapodArtifact.abi,
+    '0x000000000003212eb796dEE588acdbBbD777D4E7'
+  )
+
+  /*
+  dataPayload = MetapodDeployer.deploy({
+    data: MetapodArtifact.bytecode
+  }).encodeABI()
+
+  deployGas = await getDeployGas(dataPayload)
+
+  const Metapod = await MetapodDeployer.deploy({
+    data: MetapodArtifact.bytecode
+  }).send({
+    from: address,
+    gas: deployGas,
+    gasPrice: 10 ** 1
+  }).catch(error => {
+    console.error(error)
+    console.log(
+      ` ✘ Metapod contract deploys successfully for ${deployGas} gas`
+    )
+    failed++
+    process.exit(1)
+  })
+
+  console.log(
+    ` ✓ Metapod contract deploys successfully for ${deployGas} gas`
+  )
+  passed++
+  */
+
+  dataPayload = KakunaBasicTestDeployer.deploy({
+    data: KakunaBasicTestArtifact.bytecode
+  }).encodeABI()
+
+  deployGas = await getDeployGas(dataPayload)
+
+  const KakunaBasicTest = await KakunaBasicTestDeployer.deploy({
+    data: KakunaBasicTestArtifact.bytecode
+  }).send({
+    from: address,
+    gas: deployGas,
+    gasPrice: 10 ** 1
+  }).catch(error => {
+    console.error(error)
+    console.log(
+      ` ✘ Kakuna test contract deploys successfully for ${deployGas} gas`
+    )
+    failed++
+    process.exit(1)
+  })
+
+  console.log(
+    ` ✓ Kakuna test contract deploys successfully for ${deployGas} gas`
+  )
+  passed++
+
+  KakunaBasicTestWithPreludeCode = await kakuna.kakuna(
+    'KakunaBasicTest',
+    '0x4150', // COINBASE POP, 4 gas no-op
+    false // no logging
+  )
+  KakunaBasicTestWithPreludeInitCode = KakunaBasicTestWithPreludeCode[0]
+  KakunaBasicTestWithPreludeRuntime = KakunaBasicTestWithPreludeCode[1]
+
+  dataPayload = KakunaBasicTestDeployer.deploy({
+    data: KakunaBasicTestWithPreludeInitCode
+  }).encodeABI()
+
+  deployGas = await getDeployGas(dataPayload)
+
+  const KakunaBasicTestWithPrelude = await KakunaBasicTestDeployer.deploy({
+    data: KakunaBasicTestWithPreludeInitCode
+  }).send({
+    from: address,
+    gas: deployGas,
+    gasPrice: 10 ** 1
+  }).catch(error => {
+    console.error(error)
+    console.log(
+      ` ✘ Kakuna test contract with prelude deploys successfully for ${deployGas} gas`
+    )
+    failed++
+    process.exit(1)
+  })
+
+  console.log(
+    ` ✓ Kakuna test contract with prelude deploys successfully for ${deployGas} gas`
   )
   passed++
 
@@ -559,6 +710,7 @@ module.exports = {test: async function (provider, testingContext) {
     ).slice(12).substring(14)
   )
 
+  //console.log(web3.utils.keccak256(TransientContractArtifact.bytecode))
   create2payload = (
     '0xff' +
     MetamorphicContractFactory.options.address.slice(2) +
@@ -820,6 +972,700 @@ module.exports = {test: async function (provider, testingContext) {
       '0x3838533838f3'
     ]
   )
+
+  let metapodMetamorphicContractAddress
+  await runTest(
+    'Metapod can determine the address of a metamorphic contract',
+    Metapod,
+    'findMetamorphicContractAddress',
+    'call',
+    [
+      address + '000000000000000000000000'
+    ],
+    true,
+    value => {
+      metapodMetamorphicContractAddress = value
+    }
+  )  
+
+  let metapodTransientContractAddress
+  await runTest(
+    'Metapod can determine the address of a transient contract',
+    Metapod,
+    'findTransientContractAddress',
+    'call',
+    [
+      address + '000000000000000000000000'
+    ],
+    true,
+    value => {
+      metapodTransientContractAddress = value
+    }
+  )  
+
+  let metapodVaultContractAddress
+  await runTest(
+    'Metapod can determine the address of a vault contract',
+    Metapod,
+    'findVaultContractAddress',
+    'call',
+    [
+      address + '000000000000000000000000'
+    ],
+    true,
+    value => {
+      metapodVaultContractAddress = value
+    }
+  )
+
+  await runTest(
+    'Metapod reverts when deploying a metamorphic contract that reverts',
+    Metapod,
+    'deploy',
+    'send',
+    [
+      0,
+      '0xfe'
+    ],
+    false
+  )
+
+  await runTest(
+    'CodeCheck confirms that no transient contract exists yet',
+    CodeCheck,
+    'check',
+    'call',
+    [
+      metapodTransientContractAddress
+    ],
+    true,
+    value => {
+      assert.strictEqual(value, null)    
+    }
+  )
+
+  await runTest(
+    'CodeCheck confirms that no metamorphic contract exists yet',
+    CodeCheck,
+    'check',
+    'call',
+    [
+      metapodMetamorphicContractAddress
+    ],
+    true,
+    value => {
+      assert.strictEqual(value, null)    
+    }
+  )
+
+  await runTest(
+    'Metapod can deploy a contract',
+    Metapod,
+    'deploy',
+    'send',
+    [
+      0,
+      (
+        '0x603680600b6000396000f36e' + 
+        Metapod.options.address.slice(2 + (2 * 5)) +
+        '3318602b5773' +
+        metapodVaultContractAddress.slice(2) +
+        'ff5b600160005260206000f3'
+      )
+    ],
+    true,
+    receipt => {
+      assert.strictEqual(
+        receipt.events.Metamorphosed.returnValues.metamorphicContract,
+        metapodMetamorphicContractAddress
+      )
+    }
+  )
+
+  await runTest(
+    'CodeCheck can check the code of the new transient contract',
+    CodeCheck,
+    'check',
+    'call',
+    [
+      metapodTransientContractAddress
+    ],
+    true,
+    value => {
+      assert.strictEqual(value, null)    
+    }
+  )
+
+  await runTest(
+    'CodeCheck can check the code of the new metamorphic contract',
+    CodeCheck,
+    'check',
+    'call',
+    [
+      metapodMetamorphicContractAddress
+    ],
+    true,
+    value => {
+      assert.strictEqual(
+        value,
+        (
+          '0x6e' + 
+          Metapod.options.address.slice(2 + (2 * 5)).toLowerCase() +
+          '3318602b5773' +
+          metapodVaultContractAddress.slice(2).toLowerCase() +
+          'ff5b600160005260206000f3'
+        )
+      )    
+    }
+  )
+
+  await runTest(
+    'CodeCheck confirms that no vault contract exists yet',
+    CodeCheck,
+    'check',
+    'call',
+    [
+      metapodVaultContractAddress
+    ],
+    true,
+    value => {
+      assert.strictEqual(value, null)    
+    }
+  )
+
+  await runTest(
+    'Metapod can destroy a metamorphic contract',
+    Metapod,
+    'destroy',
+    'send',
+    [
+      0
+    ]
+  )
+
+  await runTest(
+    'Metapod can get the salt given an identifier',
+    Metapod,
+    'getSalt',
+    'call',
+    [
+      0
+    ],
+    true,
+    value => {
+      assert.strictEqual(
+        value,
+        address.toLowerCase() + '000000000000000000000000'
+      )
+    }
+  )
+
+  await runTest(
+    'Metapod can get the salt given the max identifier',
+    Metapod,
+    'getSalt',
+    'call',
+    [
+      -1
+    ],
+    true,
+    value => {
+      assert.strictEqual(
+        value,
+        address.toLowerCase() + 'ffffffffffffffffffffffff'
+      )
+    }
+  )
+
+  result = await web3.eth.call({
+    from: address,
+    to: Metapod.options.address,
+    value: 0,
+    gas: 100000,
+    gasPrice: '0x4A817C800',
+    data: '0x1215c971ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
+  })
+  assert.strictEqual(result, address.toLowerCase() + 'ffffffffffffffffffffffff')
+  console.log(' ✓ extra dirty bits are correctly cleaned from identifier')
+  passed++
+
+
+  await runTest(
+    'CodeCheck confirms that no metamorphic contract exists anymore',
+    CodeCheck,
+    'check',
+    'call',
+    [
+      metapodMetamorphicContractAddress
+    ],
+    true,
+    value => {
+      assert.strictEqual(value, null)    
+    }
+  )
+
+  await runTest(
+    'Metapod can redeploy a contract and include a value',
+    Metapod,
+    'deploy',
+    'send',
+    [
+      0,
+      (
+        '0x603680600b6000396000f36e' + 
+        Metapod.options.address.slice(2 + (2 * 5)) +
+        '3318602b5773' +
+        metapodVaultContractAddress.slice(2) +
+        'ff5b600160005260206000f3'
+      )
+    ],
+    true,
+    receipt => {
+      assert.strictEqual(
+        receipt.events.Metamorphosed.returnValues.metamorphicContract,
+        metapodMetamorphicContractAddress
+      )
+    },
+    address,
+    12345
+  )
+
+  await runTest(
+    'CodeCheck can check the code of the new transient contract',
+    CodeCheck,
+    'check',
+    'call',
+    [
+      metapodTransientContractAddress
+    ],
+    true,
+    value => {
+      assert.strictEqual(value, null)    
+    }
+  )
+
+  await runTest(
+    'CodeCheck can check the code of the new metamorphic contract',
+    CodeCheck,
+    'check',
+    'call',
+    [
+      metapodMetamorphicContractAddress
+    ],
+    true,
+    value => {
+      assert.strictEqual(
+        value,
+        (
+          '0x6e' + 
+          Metapod.options.address.slice(2 + (2 * 5)).toLowerCase() +
+          '3318602b5773' +
+          metapodVaultContractAddress.slice(2).toLowerCase() +
+          'ff5b600160005260206000f3'
+        )
+      )    
+    }
+  )
+
+  balance = await web3.eth.getBalance(metapodMetamorphicContractAddress)
+  assert.strictEqual(balance, '12345')
+  console.log(' ✓ balance of metamorphic contract is correct')
+  passed++
+
+  await runTest(
+    'CodeCheck confirms that no vault contract exists yet',
+    CodeCheck,
+    'check',
+    'call',
+    [
+      metapodVaultContractAddress
+    ],
+    true,
+    value => {
+      assert.strictEqual(value, null)    
+    }
+  )
+
+  await runTest(
+    'Metapod can destroy a metamorphic contract with a balance',
+    Metapod,
+    'destroy',
+    'send',
+    [
+      0
+    ]
+  )
+
+  await runTest(
+    'CodeCheck confirms that no vault contract exists yet',
+    CodeCheck,
+    'check',
+    'call',
+    [
+      metapodVaultContractAddress
+    ],
+    true,
+    value => {
+      assert.strictEqual(value, null)    
+    }
+  )
+
+  balance = await web3.eth.getBalance(metapodVaultContractAddress)
+  assert.strictEqual(balance, '12345')
+  console.log(' ✓ balance of vault contract is correct')
+  passed++
+
+  await runTest(
+    'Metapod can redeploy a contract when the vault has a balance',
+    Metapod,
+    'deploy',
+    'send',
+    [
+      0,
+      (
+        '0x603680600b6000396000f36e' + 
+        Metapod.options.address.slice(2 + (2 * 5)) +
+        '3318602b5773' +
+        metapodVaultContractAddress.slice(2) +
+        'ff5b600160005260206000f3'
+      )
+    ],
+    true,
+    receipt => {
+      assert.strictEqual(
+        receipt.events.Metamorphosed.returnValues.metamorphicContract,
+        metapodMetamorphicContractAddress
+      )
+    },
+    address,
+    1
+  )
+
+  await runTest(
+    'CodeCheck confirms that a vault contract now exists',
+    CodeCheck,
+    'check',
+    'call',
+    [
+      metapodVaultContractAddress
+    ],
+    true,
+    value => {
+      assert.strictEqual(
+        value,
+        (
+          "0x586e" +
+          Metapod.options.address.slice(2 + (2 * 5)).toLowerCase() +
+          "33185857595959303173" +
+          metapodTransientContractAddress.slice(2).toLowerCase() +
+          "5af1"
+        )
+      )
+    }
+  )
+
+  balance = await web3.eth.getBalance(metapodMetamorphicContractAddress)
+  assert.strictEqual(balance, '12346')
+  console.log(' ✓ balance of metamorphic contract is correct')
+  passed++
+
+  await runTest(
+    'Metapod can destroy a metamorphic contract with balance once vault exists',
+    Metapod,
+    'destroy',
+    'send',
+    [
+      0
+    ]
+  )
+
+  balance = await web3.eth.getBalance(metapodVaultContractAddress)
+  assert.strictEqual(balance, '12346')
+  console.log(' ✓ balance of vault contract is correct')
+  passed++
+
+  await runTest(
+    'Metapod can redeploy a contract when the vault is deployed with a balance',
+    Metapod,
+    'deploy',
+    'send',
+    [
+      0,
+      (
+        '0x603680600b6000396000f36e' + 
+        Metapod.options.address.slice(2 + (2 * 5)) +
+        '3318602b5773' +
+        metapodVaultContractAddress.slice(2) +
+        'ff5b600160005260206000f3'
+      )
+    ],
+    true,
+    receipt => {
+      assert.strictEqual(
+        receipt.events.Metamorphosed.returnValues.metamorphicContract,
+        metapodMetamorphicContractAddress
+      )
+    },
+    address,
+    10
+  )
+
+  balance = await web3.eth.getBalance(metapodMetamorphicContractAddress)
+  assert.strictEqual(balance, '12356')
+  console.log(' ✓ balance of metamorphic contract is correct')
+  passed++
+
+  await runTest(
+    'Metapod can destroy a metamorphic contract with balance ahead of recover',
+    Metapod,
+    'destroy',
+    'send',
+    [
+      0
+    ]
+  )
+
+  balance = await web3.eth.getBalance(metapodVaultContractAddress)
+  assert.strictEqual(balance, '12356')
+  console.log(' ✓ balance of vault contract is correct')
+  passed++
+
+  // check address balance beforehand (use proxy?)
+  await runTest(
+    'Metapod can recover the balance',
+    Metapod,
+    'recover',
+    'send',
+    [
+      0
+    ]
+  )
+  // check address balance afterwards
+
+  balance = await web3.eth.getBalance(metapodVaultContractAddress)
+  assert.strictEqual(balance, '0')
+  console.log(' ✓ balance of vault contract is correct')
+  passed++
+
+  console.log('### Testing KakunaBasicTest without prelude ###')
+
+  await runTest(
+    'constructor correctly sets test value',
+    KakunaBasicTest,
+    'constructorTest',
+    'call',
+    [],
+    true,
+    value => {
+      assert.ok(value)
+    }
+  )
+
+  await runTest(
+    'codecopy test correctly retrieves constant value',
+    KakunaBasicTest,
+    'codecopyTest',
+    'call',
+    [],
+    true,
+    value => {
+      assert.strictEqual(
+        value,
+        'This is an example string for testing CODECOPY.'
+      )
+    }
+  )
+
+  await runTest(
+    'jump test correctly jumps to first internal function',
+    KakunaBasicTest,
+    'jumpTest',
+    'call',
+    [],
+    true,
+    value => {
+      assert.strictEqual(
+        value,
+        false
+      )
+    },
+    address,
+    0,
+    30001
+  )
+
+  await runTest(
+    'jump test correctly jumps to second internal function',
+    KakunaBasicTest,
+    'jumpTest',
+    'call',
+    [],
+    true,
+    value => {
+      assert.ok(value)
+    },
+    address,
+    0,
+    30002
+  )
+
+  console.log('### Testing KakunaBasicTest with prelude ###')
+
+  await runTest(
+    'constructor correctly sets test value',
+    KakunaBasicTestWithPrelude,
+    'constructorTest',
+    'call',
+    [],
+    true,
+    value => {
+      assert.ok(value)
+    }
+  )
+
+  await runTest(
+    'codecopy test correctly retrieves constant value',
+    KakunaBasicTestWithPrelude,
+    'codecopyTest',
+    'call',
+    [],
+    true,
+    value => {
+      assert.strictEqual(
+        value,
+        'This is an example string for testing CODECOPY.'
+      )
+    }
+  )
+
+  await runTest(
+    'jump test correctly jumps to first internal function',
+    KakunaBasicTestWithPrelude,
+    'jumpTest',
+    'call',
+    [],
+    true,
+    value => {
+      assert.strictEqual(
+        value,
+        false
+      )
+    },
+    address,
+    0,
+    30001
+  )
+
+  await runTest(
+    'jump test correctly jumps to second internal function',
+    KakunaBasicTestWithPrelude,
+    'jumpTest',
+    'call',
+    [],
+    true,
+    value => {
+      assert.ok(value)
+    },
+    address,
+    0,
+    30002
+  )
+
+  console.log('### Testing Metapod with Kakuna ###')
+
+  metapodPrelude = `0x6e${
+    Metapod.options.address.toLowerCase().slice(2 + (2 * 5))
+  }3318602b5773${
+    metapodVaultContractAddress.toLowerCase().slice(2)
+  }ff5b`
+
+  ContractOneWithPrelude = await kakuna.kakuna(
+    'ContractOne',
+    metapodPrelude,
+    false // no logging
+  )
+  kakunaInitCode = ContractOneWithPrelude[0]
+  kakunaRuntime = ContractOneWithPrelude[1]
+
+  await runTest(
+    'Metapod can deploy a contract from Kakuna with the appropriate prelude',
+    Metapod,
+    'deploy',
+    'send',
+    [
+      0,
+      Buffer.from(kakunaInitCode.slice(2), 'hex')
+    ],
+    true,
+    receipt => {
+      assert.strictEqual(
+        receipt.events.Metamorphosed.returnValues.metamorphicContract,
+        metapodMetamorphicContractAddress
+      )
+    }
+  )
+
+  const MetapodKakunaContract = new web3.eth.Contract(
+    ContractOneArtifact.abi,
+    metapodMetamorphicContractAddress
+  )
+
+  await runTest(
+    'CodeCheck can check the code of the new metamorphic contract',
+    CodeCheck,
+    'check',
+    'call',
+    [
+      metapodMetamorphicContractAddress
+    ],
+    true,
+    value => {
+      assert.strictEqual(
+        value,
+        kakunaRuntime
+      )    
+    }
+  )
+
+  await runTest(
+    'Deployed contract can be interacted with',
+    MetapodKakunaContract,
+    'initialize'
+  )
+
+  await runTest(
+    'Deployed contract interaction works',
+    MetapodKakunaContract,
+    'test',
+    'call',
+    [],
+    true,
+    value => {
+      assert.strictEqual(value, '1')
+    }
+  )
+
+  await runTest(
+    'Metapod can destroy a metamorphic contract from Kakuna',
+    Metapod,
+    'destroy',
+    'send',
+    [0]
+  )
+
+  // to deploy Metapod efficiently
+  // 0x2415e7092bC80213E128536E6B22a54c718dC67A
+  // 0xaFD79DB96D018f333deb9ac821cc170F5cc81Ea8
+  // 0x8954ff8965dbf871b7b4f49acc85a2a7c96c93ebc16ba59a4d07c52d8d0b6ec2
+  // => 0xafd79db96d018f333deb9ac821cc170f5cc81ea8e73fb603a03b4000007eb5df
+  // => 0x00000001cB00be2167917C0776B68Db99510d226
+
+  // to deploy an efficient address through Metapod
+  // console.log(MetamorphicContractFactory.options.address)
+  // console.log(address)
+  // 0xb7d11e258d6663925ce8e43f07ba3b7792a573ecc2fd7682d01f8a70b2223294
+  // => 1a752c32af0aa00007693ec1
+
 
   console.log(
     `completed ${passed + failed} test${passed + failed === 1 ? '' : 's'} ` +
