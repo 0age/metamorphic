@@ -290,10 +290,6 @@ module.exports = {test: async function (provider, testingContext) {
     CodeCheckArtifact.abi
   )
 
-  //const MetapodDeployer = new web3.eth.Contract(
-  //  MetapodArtifact.abi
-  //)
-
   const KakunaBasicTestDeployer = new web3.eth.Contract(
     KakunaBasicTestArtifact.abi
   )
@@ -329,9 +325,6 @@ module.exports = {test: async function (provider, testingContext) {
     arguments: [TransientContractArtifact.bytecode]
   }).encodeABI()
 
-  //console.log(dataPayload)
-  //process.exit()
-
   deployGas = await getDeployGas(dataPayload)
 
   const MetamorphicContractFactory = await MetamorphicContractFactoryDeployer.deploy({
@@ -354,8 +347,6 @@ module.exports = {test: async function (provider, testingContext) {
     ` ✓ Metamorphic Contract Factory deploys successfully for ${deployGas} gas`
   )
   passed++
-
-  //console.log(MetamorphicContractFactory.options.address)
 
   dataPayload = ContractTwoDeployer.deploy({
     data: ContractTwoArtifact.bytecode
@@ -449,34 +440,6 @@ module.exports = {test: async function (provider, testingContext) {
     MetapodArtifact.abi,
     '0x000000000003212eb796dEE588acdbBbD777D4E7'
   )
-
-  /*
-  dataPayload = MetapodDeployer.deploy({
-    data: MetapodArtifact.bytecode
-  }).encodeABI()
-
-  deployGas = await getDeployGas(dataPayload)
-
-  const Metapod = await MetapodDeployer.deploy({
-    data: MetapodArtifact.bytecode
-  }).send({
-    from: address,
-    gas: deployGas,
-    gasPrice: 10 ** 1
-  }).catch(error => {
-    console.error(error)
-    console.log(
-      ` ✘ Metapod contract deploys successfully for ${deployGas} gas`
-    )
-    failed++
-    process.exit(1)
-  })
-
-  console.log(
-    ` ✓ Metapod contract deploys successfully for ${deployGas} gas`
-  )
-  passed++
-  */
 
   dataPayload = KakunaBasicTestDeployer.deploy({
     data: KakunaBasicTestArtifact.bytecode
@@ -710,7 +673,6 @@ module.exports = {test: async function (provider, testingContext) {
     ).slice(12).substring(14)
   )
 
-  //console.log(web3.utils.keccak256(TransientContractArtifact.bytecode))
   create2payload = (
     '0xff' +
     MetamorphicContractFactory.options.address.slice(2) +
@@ -1093,6 +1055,29 @@ module.exports = {test: async function (provider, testingContext) {
     true,
     value => {
       assert.strictEqual(value, null)    
+    }
+  )
+
+  await runTest(
+    'Metapod can determine the necessary prelude',
+    Metapod,
+    'getPrelude',
+    'call',
+    [
+      address + '000000000000000000000000',
+    ],
+    true,
+    value => {
+      assert.strictEqual(
+        value,
+        (
+          '0x6e' + 
+          Metapod.options.address.slice(2 + (2 * 5)).toLowerCase() +
+          '3318602b5773' +
+          metapodVaultContractAddress.slice(2).toLowerCase() +
+          'ff5b'
+        )
+      )
     }
   )
 
@@ -1652,20 +1637,6 @@ module.exports = {test: async function (provider, testingContext) {
     'send',
     [0]
   )
-
-  // to deploy Metapod efficiently
-  // 0x2415e7092bC80213E128536E6B22a54c718dC67A
-  // 0xaFD79DB96D018f333deb9ac821cc170F5cc81Ea8
-  // 0x8954ff8965dbf871b7b4f49acc85a2a7c96c93ebc16ba59a4d07c52d8d0b6ec2
-  // => 0xafd79db96d018f333deb9ac821cc170f5cc81ea8e73fb603a03b4000007eb5df
-  // => 0x00000001cB00be2167917C0776B68Db99510d226
-
-  // to deploy an efficient address through Metapod
-  // console.log(MetamorphicContractFactory.options.address)
-  // console.log(address)
-  // 0xb7d11e258d6663925ce8e43f07ba3b7792a573ecc2fd7682d01f8a70b2223294
-  // => 1a752c32af0aa00007693ec1
-
 
   console.log(
     `completed ${passed + failed} test${passed + failed === 1 ? '' : 's'} ` +

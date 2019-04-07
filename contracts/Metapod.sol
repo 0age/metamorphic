@@ -181,7 +181,7 @@ contract Metapod {
     metamorphicContract = _getMetamorphicContractAddress(transientContract);
 
     // ensure that the deployed runtime code has the required prelude.
-    _verifyRuntimeHeader(metamorphicContract, vaultContract);
+    _verifyPrelude(metamorphicContract, _getPrelude(vaultContract));
 
     // clear the supplied initialization code from temporary storage.
     delete _initCode;
@@ -269,7 +269,7 @@ contract Metapod {
   /**
    * @dev View function for retrieving the initialization code for a given
    * metamorphic contract to deploy via a transient contract. Called by the
-   * constructor of each transient contract.
+   * constructor of each transient contract - not meant to be called by users.
    * @return The initialization code to use to deploy the metamorphic contract.
    */
   function getInitializationCode() external view returns (
@@ -283,7 +283,7 @@ contract Metapod {
    * @dev Compute the address of the transient contract that will be created
    * upon submitting a given salt to the contract.
    * @param salt bytes32 The nonce passed into CREATE2 when deploying the
-   * transient contract.
+   * transient contract, composed of caller ++ identifier.
    * @return The address of the corresponding transient contract.
    */
   function findTransientContractAddress(
@@ -297,7 +297,7 @@ contract Metapod {
    * @dev Compute the address of the metamorphic contract that will be created
    * upon submitting a given salt to the contract.
    * @param salt bytes32 The nonce used to create the transient contract that
-   * deploys the metamorphic contract.
+   * deploys the metamorphic contract, composed of caller ++ identifier.
    * @return The address of the corresponding metamorphic contract.
    */
   function findMetamorphicContractAddress(
@@ -313,7 +313,7 @@ contract Metapod {
    * @dev Compute the address of the vault contract that will be set as the
    * recipient of funds from the metamorphic contract when it is destroyed.
    * @param salt bytes32 The nonce used to create the transient contract that
-   * deploys the metamorphic contract.
+   * deploys the metamorphic contract, composed of caller ++ identifier.
    * @return The address of the corresponding vault contract.
    */
   function findVaultContractAddress(
@@ -325,6 +325,28 @@ contract Metapod {
       )
     );
   }
+
+  /**
+   * @dev View function for retrieving the prelude that will be required for any
+   * metamorphic contract deployed via a specific salt.
+   * @param salt bytes32 The nonce used to create the transient contract that
+   * deploys the metamorphic contract, composed of caller ++ identifier.
+   * @return The prelude that will be need to be present at the start of the
+   * deployed runtime code for any metamorphic contracts deployed using the
+   * provided salt.
+   */
+  function getPrelude(bytes32 salt) external pure returns (
+    bytes memory prelude
+  ) {
+    // compute and return the prelude.
+    prelude = _getPrelude(
+      _getVaultContractAddress(
+        _getVaultContractInitializationCode(
+          _getTransientContractAddress(salt)
+        )
+      )
+    );
+  }  
 
   /**
    * @dev View function for retrieving the initialization code of metamorphic
@@ -381,25 +403,35 @@ contract Metapod {
   }
 
   /**
-   * @dev Internal function for determining if deployed metamorphic contract has
-   * the necessary "header" at the start of its runtime code. The header ensures
-   * that the contract can be destroyed by a call originating from this contract
-   * and that any funds will be forwarded to the corresponding vault contract.
-   * @param metamorphicContract address The address of the metamorphic contract.
+   * @dev Internal function for determining the required prelude for metamorphic
+   * contracts deployed through the factory based on the corresponding vault
+   * contract.
    * @param vaultContract address The address of the vault contract.
+   * @return The prelude that will be required for given a vault contract.
    */
-  function _verifyRuntimeHeader(
-    address metamorphicContract,
+  function _getPrelude(
     address vaultContract
-  ) internal view {
-    // construct the code to compare initial contract runtime against.
-    bytes memory requiredRuntimeHeader = abi.encodePacked(
+  ) internal pure returns (bytes memory prelude) {
+    prelude = abi.encodePacked(
       // PUSH15 <this> CALLER XOR PUSH1 43 JUMPI PUSH20
       bytes22(0x6e03212eb796dee588acdbbbd777d4e73318602b5773),
       vaultContract, // <vault is the approved SELFDESTRUCT recipient>
       bytes2(0xff5b) // SELFDESTRUCT JUMPDEST
     );
+  }
 
+  /**
+   * @dev Internal function for determining if deployed metamorphic contract has
+   * the necessary prelude at the start of its runtime code. The prelude ensures
+   * that the contract can be destroyed by a call originating from this contract
+   * and that any funds will be forwarded to the corresponding vault contract.
+   * @param metamorphicContract address The address of the metamorphic contract.
+   * @param prelude bytes The prelude that must be present on the contract.
+   */
+  function _verifyPrelude(
+    address metamorphicContract,
+    bytes memory prelude
+  ) internal view {
     // get the first 44 bytes of metamorphic contract runtime code.
     bytes memory runtimeHeader;
 
@@ -416,7 +448,7 @@ contract Metapod {
     // ensure that the contract's runtime code has the correct initial sequence.
     require(
       keccak256(
-        abi.encodePacked(requiredRuntimeHeader)
+        abi.encodePacked(prelude)
       ) == keccak256(
         abi.encodePacked(runtimeHeader)
       ),
